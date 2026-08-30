@@ -22,7 +22,7 @@ const app: Application = express();
 
 app.use(
     cors({
-        origin: env.CLIENT_URL,
+        origin: true,
         credentials: true,
     })
 );
@@ -92,6 +92,9 @@ import conflictRoutes from "./routes/conflictRoutes";
 import eventRoutes from "./routes/eventRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 import aiRoutes from "./routes/aiRoutes";
+import stationRoutes from "./routes/stationRoutes";
+import trackRoutes from "./routes/trackRoutes";
+import networkRoutes from "./routes/networkRoutes";
 
 /* --------------------------------------------------
    API Routes
@@ -103,6 +106,9 @@ app.use("/api/conflicts", conflictRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/stations", stationRoutes);
+app.use("/api/tracks", trackRoutes);
+app.use("/api/network", networkRoutes);
 
 /* --------------------------------------------------
    404 Handler

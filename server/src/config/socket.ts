@@ -14,8 +14,8 @@ class SocketManager {
 
         this.io = new Server(server, {
             cors: {
-                origin: env.CLIENT_URL,
-                methods: ["GET", "POST"],
+                origin: true,
+                methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
                 credentials: true,
             },
 

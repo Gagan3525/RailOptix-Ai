@@ -1,140 +1,70 @@
 import railwayState from "../../services/railwayState";
-
 import { TrainStatus } from "../../models/Train";
 import { SignalStatus } from "../../models/Signal";
-
 import routeEngine from "../route/routeEngine";
 import routePlanner from "../route/routePlanner";
 
 class MovementEngine {
-
     update(): void {
-
         railwayState.trains.forEach(train => {
-
-            /**
-             * Only move running trains
-             */
+            // Only move running trains
             if (train.status !== TrainStatus.RUNNING) {
                 return;
             }
 
-            /**
-             * Check signal on current track
-             */
-            const signal = railwayState.signals.find(
-                signal => signal.trackId === train.currentTrackId
-            );
-
+            // Check signal aspect on current track
+            const signal = railwayState.signals.find(s => s.trackId === train.currentTrackId);
             if (signal && signal.status === SignalStatus.RED) {
-                return;
-            }
-
-            /**
-             * Reserve current track
-             */
-            const reserved = routeEngine.reserveTrack(
-                train.trainNumber,
-                train.currentTrackId
-            );
-
-            if (!reserved) {
-
-                console.log(
-                    `🚫 Track ${train.currentTrackId} already reserved`
-                );
-
-                train.status = TrainStatus.STOPPED;
-
+                train.speed = 0;
+                train.delay += 1; // Accumulate delay while held at red signal
                 railwayState.markTrainDirty(train.trainNumber);
+                return;
+            } else if (signal && signal.status === SignalStatus.YELLOW) {
+                train.speed = 40; // Regulate speed on yellow signal
+            } else {
+                train.speed = 85; // Normal running speed
+            }
 
+            // Reserve track
+            const reserved = routeEngine.reserveTrack(train.trainNumber, train.currentTrackId);
+            if (!reserved) {
+                train.delay += 1;
+                railwayState.markTrainDirty(train.trainNumber);
                 return;
             }
 
-            /**
-             * Move train smoothly along track segment
-             */
-            const stepDelta = train.speed > 0 ? (train.speed / 5000) : 0.01;
+            // Move train smoothly along track segment
+            const stepDelta = train.speed > 0 ? (train.speed / 2000) : 0.02;
             train.position += stepDelta;
 
-            /**
-             * Reached end of current track
-             */
-            if (train.position >= 1) {
-
-                train.position = 0;
-
+            // Reached end of current track segment
+            if (train.position >= 1.0) {
+                train.position = 0.0;
                 routeEngine.releaseTrack(train.currentTrackId);
 
-                /**
-                 * Move to next station
-                 */
-                if (
-                    train.route.length > 0 &&
-                    train.routeIndex < train.route.length - 1
-                ) {
+                // Advance along route
+                if (train.route && train.route.length > 0) {
+                    train.routeIndex = (train.routeIndex + 1) % train.route.length;
+                    train.currentStationId = train.route[train.routeIndex];
 
-                    train.routeIndex++;
-
-                    train.currentStationId =
-                        train.route[train.routeIndex];
-
-                    /**
-                     * Update next station
-                     */
-                    if (train.routeIndex < train.route.length - 1) {
-
-                        train.nextStationId =
-                            train.route[train.routeIndex + 1];
-
-                    } else {
-
-                        train.nextStationId =
-                            train.destinationStationId;
-
-                    }
-
+                    const nextIdx = (train.routeIndex + 1) % train.route.length;
+                    train.nextStationId = train.route[nextIdx];
                 }
 
-                /**
-                 * Find next track
-                 */
-                const nextTrack = routePlanner.getNextTrack(
-                    train.trainNumber
-                );
-
+                // Find next track for new segment
+                const nextTrack = routePlanner.getNextTrack(train.trainNumber);
                 if (nextTrack) {
-
                     train.currentTrackId = nextTrack;
-
-                } else {
-
-                    train.status = TrainStatus.STOPPED;
-
-                    console.log(
-                        `🏁 ${train.trainNumber} reached destination`
-                    );
-
                 }
-
             }
 
-            /**
-             * Safety clamp
-             */
-            train.position = Math.max(
-                0,
-                Math.min(1, train.position)
-            );
+            // Safety clamp position between 0 and 1
+            train.position = Math.max(0.0, Math.min(1.0, train.position));
 
-            railwayState.markTrainDirty(
-                train.trainNumber
-            );
-
+            // Mark train dirty for DB & WebSocket broadcast
+            railwayState.markTrainDirty(train.trainNumber);
         });
-
     }
-
 }
 
 export default new MovementEngine();

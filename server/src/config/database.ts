@@ -13,7 +13,10 @@ class Database {
     }
 
     try {
-      await mongoose.connect(env.MONGODB_URI);
+      // Connect with 3-second server selection timeout to avoid long blocking
+      await mongoose.connect(env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 3000,
+      });
 
       this.connected = true;
 
@@ -25,29 +28,34 @@ class Database {
 
       this.registerEvents();
     } catch (error) {
-      console.error("❌ MongoDB Connection Failed");
-      console.error(error);
-
-      process.exit(1);
+      this.connected = false;
+      console.warn("=================================================");
+      console.warn("⚠️  MongoDB Connection Failed (ECONNREFUSED 127.0.0.1:27017)");
+      console.warn("⚠️  Running in In-Memory Railway Simulation Mode");
+      console.warn("📌  To enable MongoDB persistence, start your local MongoDB service:");
+      console.warn("    PowerShell / Cmd: net start MongoDB  or  mongod");
+      console.warn("=================================================");
     }
   }
 
   private registerEvents(): void {
     mongoose.connection.on("connected", () => {
+      this.connected = true;
       console.log("🟢 MongoDB Connected");
     });
 
     mongoose.connection.on("reconnected", () => {
+      this.connected = true;
       console.log("🟡 MongoDB Reconnected");
     });
 
     mongoose.connection.on("disconnected", () => {
+      this.connected = false;
       console.log("🔴 MongoDB Disconnected");
     });
 
     mongoose.connection.on("error", (error) => {
-      console.error("❌ MongoDB Error");
-      console.error(error);
+      console.error("❌ MongoDB Error:", error.message || error);
     });
 
     process.on("SIGINT", async () => {
@@ -63,11 +71,8 @@ class Database {
 
   public async disconnect(): Promise<void> {
     if (!this.connected) return;
-
     await mongoose.connection.close();
-
     this.connected = false;
-
     console.log("🛑 MongoDB Connection Closed");
   }
 

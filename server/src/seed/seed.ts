@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import Station from "../models/Station";
-import Track from "../models/Track";
+import Track, { TrackStatus } from "../models/Track";
 import Signal, { SignalStatus } from "../models/Signal";
 import Train, { TrainDirection, TrainStatus } from "../models/Train";
 import TrackBlock, { BlockStatus } from "../models/TrackBlock";
@@ -9,7 +9,7 @@ import Event, { EventType } from "../models/Event";
 import env from "../config/env";
 import logger from "../config/logger";
 
-const STATIONS = [
+export const STATIONS = [
   { stationId: "ST-NDLS", name: "New Delhi", code: "NDLS", latitude: 28.6139, longitude: 77.2090, platforms: 16, isJunction: true },
   { stationId: "ST-GWL", name: "Gwalior Junction", code: "GWL", latitude: 26.2183, longitude: 78.1828, platforms: 4, isJunction: false },
   { stationId: "ST-JHS", name: "Jhansi Junction", code: "JHS", latitude: 25.4484, longitude: 78.5685, platforms: 8, isJunction: true },
@@ -24,33 +24,33 @@ const STATIONS = [
   { stationId: "ST-UD", name: "Udupi", code: "UD", latitude: 13.3409, longitude: 74.7421, platforms: 3, isJunction: false },
 ];
 
-const TRACKS = [
-  { trackId: "TK-CSMT-BPL", name: "Central Main Line (CSMT-BPL)", sourceStationId: "ST-CSMT", destinationStationId: "ST-BPL", distanceKm: 830, isOccupied: true },
-  { trackId: "TK-BPL-JHS", name: "North-South Line (BPL-JHS)", sourceStationId: "ST-BPL", destinationStationId: "ST-JHS", distanceKm: 290, isOccupied: true },
-  { trackId: "TK-JHS-GWL", name: "North Corridor (JHS-GWL)", sourceStationId: "ST-JHS", destinationStationId: "ST-GWL", distanceKm: 100, isOccupied: true },
-  { trackId: "TK-GWL-NDLS", name: "Capital Radial (GWL-NDLS)", sourceStationId: "ST-GWL", destinationStationId: "ST-NDLS", distanceKm: 310, isOccupied: true },
-  { trackId: "TK-SBC-HYB", name: "Deccan Route (SBC-HYB)", sourceStationId: "ST-SBC", destinationStationId: "ST-HYB", distanceKm: 570, isOccupied: true },
-  { trackId: "TK-HYB-BPL", name: "Telangana Express Line (HYB-BPL)", sourceStationId: "ST-HYB", destinationStationId: "ST-BPL", distanceKm: 500, isOccupied: false },
-  { trackId: "TK-HWH-JHS", name: "Eastern Link (HWH-JHS)", sourceStationId: "ST-HWH", destinationStationId: "ST-JHS", distanceKm: 1100, isOccupied: true },
-  { trackId: "TK-DBRG-HWH", name: "Northeast Trunk (DBRG-HWH)", sourceStationId: "ST-DBRG", destinationStationId: "ST-HWH", distanceKm: 1400, isOccupied: true },
-  { trackId: "TK-MAS-HYB", name: "Coromandel Link (MAS-HYB)", sourceStationId: "ST-MAS", destinationStationId: "ST-HYB", distanceKm: 620, isOccupied: false },
-  { trackId: "TK-PUNE-BPL", name: "Western Diagonal (PUNE-BPL)", sourceStationId: "ST-PUNE", destinationStationId: "ST-BPL", distanceKm: 780, isOccupied: false },
+export const TRACKS = [
+  { trackId: "TK-CSMT-BPL", name: "Central Main Line (CSMT-BPL)", fromStation: "ST-CSMT", toStation: "ST-BPL", length: 830, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-BPL-JHS", name: "North-South Line (BPL-JHS)", fromStation: "ST-BPL", toStation: "ST-JHS", length: 290, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-JHS-GWL", name: "North Corridor (JHS-GWL)", fromStation: "ST-JHS", toStation: "ST-GWL", length: 100, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-GWL-NDLS", name: "Capital Radial (GWL-NDLS)", fromStation: "ST-GWL", toStation: "ST-NDLS", length: 310, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-SBC-HYB", name: "Deccan Route (SBC-HYB)", fromStation: "ST-SBC", toStation: "ST-HYB", length: 570, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-HYB-BPL", name: "Telangana Express Line (HYB-BPL)", fromStation: "ST-HYB", toStation: "ST-BPL", length: 500, status: TrackStatus.AVAILABLE },
+  { trackId: "TK-HWH-JHS", name: "Eastern Link (HWH-JHS)", fromStation: "ST-HWH", toStation: "ST-JHS", length: 1100, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-DBRG-HWH", name: "Northeast Trunk (DBRG-HWH)", fromStation: "ST-DBRG", toStation: "ST-HWH", length: 1400, status: TrackStatus.OCCUPIED },
+  { trackId: "TK-MAS-HYB", name: "Coromandel Link (MAS-HYB)", fromStation: "ST-MAS", toStation: "ST-HYB", length: 620, status: TrackStatus.AVAILABLE },
+  { trackId: "TK-PUNE-BPL", name: "Western Diagonal (PUNE-BPL)", fromStation: "ST-PUNE", toStation: "ST-BPL", length: 780, status: TrackStatus.AVAILABLE },
 ];
 
-const SIGNALS = [
-  { signalId: "SIG-NDLS-APPROACH", trackId: "TK-GWL-NDLS", aspect: SignalStatus.RED, isAutomatic: true, name: "NDLS Approach Signal", position: 0.9 },
-  { signalId: "SIG-JHS-JUNCTION", trackId: "TK-BPL-JHS", aspect: SignalStatus.YELLOW, isAutomatic: true, name: "JHS Junction Signal", position: 0.5 },
-  { signalId: "SIG-BPL-MAIN", trackId: "TK-CSMT-BPL", aspect: SignalStatus.GREEN, isAutomatic: true, name: "BPL Main Signal", position: 0.8 },
-  { signalId: "SIG-HWH-APPROACH", trackId: "TK-HWH-JHS", aspect: SignalStatus.GREEN, isAutomatic: true, name: "HWH Approach Signal", position: 0.6 },
+export const SIGNALS = [
+  { signalId: "SIG-NDLS-APPROACH", trackId: "TK-GWL-NDLS", status: SignalStatus.RED, isAutomatic: true, name: "NDLS Approach Signal", position: 0.9 },
+  { signalId: "SIG-JHS-JUNCTION", trackId: "TK-BPL-JHS", status: SignalStatus.YELLOW, isAutomatic: true, name: "JHS Junction Signal", position: 0.5 },
+  { signalId: "SIG-BPL-MAIN", trackId: "TK-CSMT-BPL", status: SignalStatus.GREEN, isAutomatic: true, name: "BPL Main Signal", position: 0.8 },
+  { signalId: "SIG-HWH-APPROACH", trackId: "TK-HWH-JHS", status: SignalStatus.GREEN, isAutomatic: true, name: "HWH Approach Signal", position: 0.6 },
 ];
 
-const BLOCKS = [
+export const BLOCKS = [
   { blockId: "BLK-NDLS-01", trackId: "TK-GWL-NDLS", startKm: 290, endKm: 310, status: BlockStatus.OCCUPIED, occupiedByTrain: "12951" },
   { blockId: "BLK-NDLS-02", trackId: "TK-GWL-NDLS", startKm: 280, endKm: 290, status: BlockStatus.OCCUPIED, occupiedByTrain: "12424" },
   { blockId: "BLK-JHS-01", trackId: "TK-BPL-JHS", startKm: 250, endKm: 290, status: BlockStatus.OCCUPIED, occupiedByTrain: "12627" },
 ];
 
-const TRAINS = [
+export const TRAINS = [
   {
     trainNumber: "12951",
     name: "Mumbai Rajdhani Exp",

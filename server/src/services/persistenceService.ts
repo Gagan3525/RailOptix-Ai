@@ -1,11 +1,15 @@
 import railwayState from "./railwayState";
-
+import database from "../config/database";
 import Conflict from "../models/Conflict";
 import Event from "../models/Event";
 
 class PersistenceService {
 
     async save(): Promise<void> {
+        if (!database.isConnected()) {
+            railwayState.clearDirtyObjects();
+            return;
+        }
 
         /**
          * Save Updated Trains

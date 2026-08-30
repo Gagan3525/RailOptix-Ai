@@ -1,22 +1,31 @@
 import { useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 import { useSimulationStore } from "../store/simulationStore";
-import { SIMULATION_CONFIG } from "../simulation/constants/simulationConfig";
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || "http://localhost:5000";
 
 export function useRailwaySimulation() {
   const simulation = useSimulationStore((state) => state.simulation);
   const updateFromBackend = useSimulationStore((state) => state.updateFromBackend);
-  const startSimulation = useSimulationStore((state) => state.startSimulation);
-  const stopSimulation = useSimulationStore((state) => state.stopSimulation);
-  const tick = useSimulationStore((state) => state.tick);
 
   useEffect(() => {
-    startSimulation();
+    // Initial fetch from backend REST API
+    fetch(`${SOCKET_URL}/api/network`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.trains) {
+          updateFromBackend({
+            trains: data.trains,
+            stations: data.stations,
+            tracks: data.tracks,
+            signals: data.signals,
+            conflicts: data.conflicts,
+          });
+        }
+      })
+      .catch((err) => console.warn("Failed to fetch initial network state:", err));
 
     let socket: Socket | null = null;
-    let isConnected = false;
 
     try {
       socket = io(SOCKET_URL, {
@@ -26,7 +35,6 @@ export function useRailwaySimulation() {
       });
 
       socket.on("connect", () => {
-        isConnected = true;
         console.log("🔌 Connected to RailOptix Real-Time WebSocket Server");
       });
 
@@ -34,6 +42,8 @@ export function useRailwaySimulation() {
         if (data) {
           updateFromBackend({
             trains: data.trains || simulation.trains,
+            stations: data.stations || simulation.stations,
+            tracks: data.tracks || simulation.tracks,
             signals: data.signals || simulation.signals,
             conflicts: data.conflicts || simulation.conflicts,
             aiDecision: data.recommendations && data.recommendations[0]
@@ -47,25 +57,16 @@ export function useRailwaySimulation() {
       });
 
       socket.on("disconnect", () => {
-        isConnected = false;
-        console.log("❌ Disconnected from WebSocket, switching to local state ticker");
+        console.log("❌ Disconnected from WebSocket, attempting reconnect...");
       });
     } catch (err) {
-      console.warn("WebSocket connection failed, running local ticker:", err);
+      console.warn("WebSocket connection failed:", err);
     }
 
-    const timer = setInterval(() => {
-      if (!isConnected) {
-        tick();
-      }
-    }, SIMULATION_CONFIG.TICK_RATE_MS);
-
     return () => {
-      clearInterval(timer);
       if (socket) {
         socket.disconnect();
       }
-      stopSimulation();
     };
   }, []);
 
